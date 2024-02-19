@@ -1,0 +1,180 @@
+---
+title: "random_effects"
+output: html_document
+date: "2024-02-18"
+---
+
+Let's see what's up!
+```{r Theme Set}
+theme_set(  theme(
+                  strip.background = element_rect(fill = "White"),
+                  panel.background = element_rect(fill = "white",
+                                                  colour = "black"), 
+                  panel.grid.major = element_blank(), 
+                  panel.grid.minor = element_blank(), 
+                  text = element_text(size = 14)))
+```
+
+So, I have been hesitating doing advanced modelling because it is a quick way to get lost in the sauce and to make mistakes but I am hearing the whispers in the wind that y'all are out here throwing mixed models up anyway, so like a good friend if you're gonna jump off the balcony at a pool party I'm at least going to put like a trampoline down there. 
+
+Short and sweet definition: Mixed models just include random effects. 
+
+Random effect
+Now for this to work, you must have multiple observations within a grouped variable. SO, if you go to multiple farms you have to have multiple observations (think, at least like 5 is a good goal), or if you are testing individuals then you have to have multiple samples from each individual.
+
+Let's say you are interested in plant disease and go sample a bunch of different plants from a bunch of different farms. Or penguin poop from different populations. Point being is that if in your model could either look like this:
+
+#Understanding random effects
+Why not just throw it in fixed effects? 
+The problem with this model is that the explanatory variable farm consumes 23 degrees of freedom and we are not even interested in knowing that there is a farm effect.
+
+## Random effects better account for correlated structures and uncertainty. 
+
+**Fixed effects** estimate separate levels with no relationship assumed between the levels. For example in a model with a fixed effect for fish sex you would get an estimate for male and then estimate for female separately.
+In a **random effect** each level can be thought of as a random variable from an underlying process or distribution.  that the given levels in a random effect are not separate and independent but really representative levels from in larger collection of levels, which may not even be observed.
+
+
+##Literature
+e.g. Vicente et al. (2006) and Pierce et al. (2007) among others.
+https://bookdown.org/steve_midway/DAR/random-effects.html#introduction-3
+
+Beautifully said here, "There has been somewhat of a move to not try to scrub our models of all variance, but rather to find the right home for the variance. In other words there can be information in the variance. Variance is ubiquitous but understanding what part of the system holds what proportions of the variance can be very helpful to our understanding the systems we seek to model. We are familiar with the residual variance from our linear models, but might that residual variance be better attributed to within a group? Or between a group?"
+https://bookdown.org/steve_midway/DAR/random-effects.html 
+
+
+## Can we start coding?
+```{r Libraries}
+library(tidyverse)
+library(glmmTMB)
+library(DHARMa)
+library(ggplot2)
+library(scico)
+library(forcats)
+```
+
+How about some data?
+
+```{r Data}
+#I really wanted to work with the penguins, and I think that this is the perfect example!
+library(palmerpenguins)
+data(package = 'palmerpenguins')
+pen<- penguins %>%
+      drop_na()
+
+#Let's do a quick shout out the the amazing Allison Horst the maintainer of this dataset and fantastic science by Alison Hill and Kristen Gorman.
+?palmerpenguins
+
+
+```
+
+I need to tell you I LOVE this data set. Like these data make me feel some type of way. Yum. Alright. 
+
+#Alright you know me we can't do anything without taking a quick peek
+```{r Plot}
+#so here, we are just interested in knowing how penguin size is explained by sex. 
+
+ggplot(pen, aes(y = body_mass_g, x = sex, colour = species))+ 
+  geom_jitter(width = 0.2, height = 0) +
+  facet_wrap(~island)+ 
+  xlab("Sex") +
+  ylab("Body Mass (g)")+
+  scale_colour_scico_d(palette = "tofino")
+
+```
+
+#GREAT, let's jump into the models!
+
+```{r Live Coding}
+
+#Model 1: The average body size of sex across islands
+
+mod1<- glmmTMB(body_mass_g ~ sex + (1|island), data = pen, family = gaussian())
+
+summary(mod1)
+coef(mod1)
+
+#proof of releveling!!! (see later in the video)
+levels(pen$sex) #see how "female" is here first?
+pen$Sex<- relevel(pen$sex, "male")
+levels(pen$Sex) #check that it has been stored, see it is different now!
+mod1b<- glmmTMB(body_mass_g ~ Sex + (1|island), data = pen, family = gaussian())
+
+summary(mod1b)
+coef(mod1b)
+
+#Model 2: The average body size of sex across species
+
+mod2<- glmmTMB(body_mass_g ~ sex + (1|species), data = pen, family = gaussian())
+
+summary(mod2)
+coef(mod2)
+
+#Model 3: The average body size of sex based on different species on each island
+mod3<- glmmTMB(body_mass_g ~ sex + (1|species:island), data = pen, family = gaussian())
+
+summary(mod3)
+coef(mod3)
+
+#Model 4: Biologically realistic. 
+mod3<- glmmTMB(body_mass_g ~ sex + species + (1|island), data = pen, family = gaussian())
+
+#Interactive effects? 
+# Yes! I would actually go for an interaction between these (it further reduces variance). If you guys are interested in learning more about this, lmk!
+
+```
+
+
+
+
+
+
+
+```{r Random Intercept Models}
+#The average body size of sex across islands
+mod1<- glmmTMB(body_mass_g ~ sex + (1|island), data = pen, family = gaussian())
+
+summary(mod1)
+#now, you can "open up" the random effect, to get (individual factor level) island-level random estimations. Now you will see that "males" our "slope" is constant across levels. Thaat's because we coded a random "intercept" model. Same as fixed effect estimate????
+coef(mod1)
+
+#The average body size of sex across species
+mod2<- glmmTMB(body_mass_g ~ sex + (1|species), data = pen, family = gaussian())
+
+summary(mod2)
+#now, you can "open up" the random effect, to get (individual factor level) island-level random estimations.
+coef(mod2)
+
+#The average body size of sex based on different species on each island
+mod3<- glmmTMB(body_mass_g ~ sex + (1|species:island), data = pen, family = gaussian())
+
+summary(mod3)
+#now, you can "open up" the random effect, to get (individual factor level) island-level random estimations.
+coef(mod3)
+
+#how i would biologically parameterize the model
+mod4<- glmmTMB(body_mass_g ~ sex + species + (1|island), data = pen, family = gaussian()) 
+
+summary(mod4)
+#now, you can "open up" the random effect, to get (individual factor level) island-level random estimations.
+coef(mod4)
+levels(pen$species)
+
+anova(mod1, mod2, mod3, mod4)
+
+#Let's briefly talk about interactive effects!This might be a way to explain more variance. 
+
+#What if we added interaction to this?
+mod5<- glmmTMB(body_mass_g ~ sex * species + (1|island), data = pen, family = gaussian()) 
+
+summary(mod5)
+
+anova(mod4, mod5)
+
+```
+
+
+#maybe we should try another data set lol
+```{r}
+
+```
+
