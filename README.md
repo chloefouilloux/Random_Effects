@@ -11,3 +11,4 @@ https://allisonhorst.github.io/palmerpenguins/
 https://bookdown.org/steve_midway/DAR/random-effects.html#introduction-3 
 
 https://peerj.com/articles/9522/ 
+(Source of figure for thumbnail DOI: 10.7717/peerj.9522/fig-1)
